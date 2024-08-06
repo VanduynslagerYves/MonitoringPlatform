@@ -1,0 +1,15 @@
+## Set a user on the rabbitmq server and assign privileges:
+sudo rabbitmqctl add_user serviceuser password
+sudo rabbitmqctl set_permissions -p / serviceuser ".*" ".*" ".*"
+
+## management interface enabelen
+rabbitmq-plugins enable rabbitmq_management
+
+admin user toevoegen met management tag
+rabbitmqctl add_user admin password
+rabbitmqctl set_user_tags admin administrator
+rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+
+## delete guest user
+rabbitmqctl delete_user "guest"
+

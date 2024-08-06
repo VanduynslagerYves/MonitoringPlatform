@@ -1,0 +1,4 @@
+installutil WindowsMonitor.exe
+installutil /uninstall WindowsMonitor.exe
+
+als admin

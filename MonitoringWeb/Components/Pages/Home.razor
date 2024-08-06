@@ -1,0 +1,85 @@
+﻿@page "/"
+
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using MonitoringWeb.Model
+@using MonitoringWeb.Service
+@using Microsoft.AspNetCore.SignalR
+
+@inject NavigationManager Navigation
+@inject DataService DataService
+
+@implements IAsyncDisposable
+
+<h1>Client monitoring</h1>
+
+<div @ref="listContainer">
+@if (records == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Hostname</th>
+                <th>OS</th>
+                <th>Username</th>
+                <th>CPU</th>
+                <th>Used memory</th>
+                <th>Total memory </th>
+                <th>Uptime</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var record in records)
+            {
+                <ListItemComponent Item="@record" />
+            }
+        </tbody>
+    </table>
+}
+</div>
+
+@code {
+    private ElementReference listContainer;
+    // private List<SystemInfoRecord>? records;
+    private List<SystemInfoRecord>? records;
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("OnInitialized called.");
+        _ = LoadData();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/datahub"))
+            .Build();
+
+        hubConnection.On("ReceiveDataUpdate", async () =>
+        {
+            Console.WriteLine("ReceiveDataUpdate called.");
+            await LoadData();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadData()
+    {
+        Console.WriteLine("LoadData called.");
+        records = await DataService.GetAllAsync();//.GetLastAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
