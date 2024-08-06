@@ -1,0 +1,91 @@
+﻿@page "/"
+
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using MonitoringWeb.Model
+@using MonitoringWeb.Service
+@using Microsoft.AspNetCore.SignalR
+
+@inject NavigationManager Navigation
+@inject DataService DataService
+
+@implements IAsyncDisposable
+
+<h1>Client monitoring</h1>
+
+@if (record == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Hostname</th>
+                <th>OS</th>
+                <th>Username</th>
+                <th>CPU</th>
+                <th>Used memory</th>
+                <th>Total memory </th>
+                <th>Uptime</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+@*             @foreach (var record in records)
+            { *@
+                <tr>
+                    <td>@record.HostName</td>
+                    <td>@record.OperatingSystem</td>
+                    <td>@record.UserName</td>
+                    <td>@record.CPULoad %</td>
+                    <td>@string.Format("{0:N2} GB",record.UsedMemory)</td>
+                    <td>@string.Format("{0:N2} GB",record.TotalMemory)</td>
+                    <td>@record.UpTime.ToString(@"hh\:mm\:ss")</td>
+                    <td>@record.TimeStamp</td>
+                </tr>
+            @* } *@
+        </tbody>
+    </table>
+}
+
+@code {
+    // private List<SystemInfoRecord>? records;
+    private SystemInfoRecord? record;
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("OnInitialized called.");
+        _ = LoadData();
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/datahub"))
+            .Build();
+
+        hubConnection.On("ReceiveDataUpdate", async () =>
+        {
+            Console.WriteLine("ReceiveDataUpdate called.");
+            await LoadData();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadData()
+    {
+        Console.WriteLine("LoadData called.");
+        record = await DataService.GetLastAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
