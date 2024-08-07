@@ -3,6 +3,7 @@ using MonitoringWeb.Config;
 using MonitoringWeb.Model;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -14,8 +15,8 @@ namespace MonitoringWeb.Service
     /// </summary>
     public class MqDataReceiver : BackgroundService
     {
-        private IConnection _connection;
-        private IModel _receiveChannel;
+        private IConnection? _connection;
+        private IModel? _receiveChannel;
         private IServiceProvider _serviceProvider;
 
         private readonly ConnectionFactory _factory;
@@ -30,19 +31,29 @@ namespace MonitoringWeb.Service
                 UserName = mqConfig.Value.UserName,
                 Password = mqConfig.Value.Password,
             };
-
-            _connection = _factory.CreateConnection();
-            _receiveChannel = _connection.CreateModel();
-
-
-            _receiveChannel.QueueDeclare(queue: "monitor_service_queue",
-                durable: false, exclusive: false, autoDelete: false, arguments: null);
-
-            _receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            while (_receiveChannel == null)
+            {
+                try
+                {
+                    //try catch here foor createConnection
+                    _connection = _factory.CreateConnection();
+                    _receiveChannel = _connection.CreateModel();
+
+                    _receiveChannel.QueueDeclare(queue: "monitor_service_queue",
+                        durable: false, exclusive: false, autoDelete: false, arguments: null);
+
+                    _receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
+                }
+                catch (BrokerUnreachableException e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
+            }
+
             var createConsumer = new EventingBasicConsumer(_receiveChannel);
             createConsumer.Received += async (model, ea) =>
             {

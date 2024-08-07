@@ -14,7 +14,8 @@
 
 <h1>Client monitoring</h1>
 
-@if (record == null)
+<div @ref="listContainer">
+@if (records == null)
 {
     <p><em>Loading...</em></p>
 }
@@ -34,26 +35,19 @@ else
             </tr>
         </thead>
         <tbody>
-@*             @foreach (var record in records)
-            { *@
-                <tr>
-                    <td>@record.HostName</td>
-                    <td>@record.OperatingSystem</td>
-                    <td>@record.UserName</td>
-                    <td>@record.CPULoad %</td>
-                    <td>@string.Format("{0:N2} GB",record.UsedMemory)</td>
-                    <td>@string.Format("{0:N2} GB",record.TotalMemory)</td>
-                    <td>@record.UpTime.ToString(@"hh\:mm\:ss")</td>
-                    <td>@record.TimeStamp</td>
-                </tr>
-            @* } *@
+            @foreach (var record in records)
+            {
+                <ListItemComponent Item="@record" />
+            }
         </tbody>
     </table>
 }
+</div>
 
 @code {
+    private ElementReference listContainer;
     // private List<SystemInfoRecord>? records;
-    private SystemInfoRecord? record;
+    private List<SystemInfoRecord>? records;
     private HubConnection? hubConnection;
 
     protected override async Task OnInitializedAsync()
@@ -78,7 +72,7 @@ else
     private async Task LoadData()
     {
         Console.WriteLine("LoadData called.");
-        record = await DataService.GetLastAsync();
+        records = await DataService.GetAllAsync();//.GetLastAsync();
     }
 
     public async ValueTask DisposeAsync()

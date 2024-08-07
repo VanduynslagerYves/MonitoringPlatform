@@ -24,10 +24,11 @@ namespace WindowsMonitor.Service
             // Initialize RabbitMQ Connection settings
             _factory = new ConnectionFactory
             { //TODO: read from appsettings
-                HostName = "192.168.152.142",
-                UserName = "serviceuser",
+                HostName = "127.0.0.1",//"192.168.152.142",
+                UserName = "admin",//"serviceuser",
                 Password = "root0603",
                 Port = 5672,
+                VirtualHost = "/"
 
                 /*
                 192.168.152.142
@@ -236,37 +237,5 @@ namespace WindowsMonitor.Service
                 throw ex;
             }
         }
-
-        /* CONSUMER code
-         * // Configure RabbitMQ connection
-        var factory = new ConnectionFactory() { HostName = "localhost" };
-        using (var connection = factory.CreateConnection())
-        using (var channel = connection.CreateModel())
-        {
-            // Declare a queue
-            channel.QueueDeclare(queue: "my_queue",
-                                 durable: false,
-                                 exclusive: false,
-                                 autoDelete: false,
-                                 arguments: null);
-
-            // Start consuming messages
-            var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += (model, ea) =>
-            {
-                // Deserialize JSON message
-                var body = ea.Body.ToArray();
-                var jsonMessage = Encoding.UTF8.GetString(body);
-                var data = JsonSerializer.Deserialize<dynamic>(jsonMessage);
-
-                Console.WriteLine(" [x] Received: {0}", data);
-            };
-            channel.BasicConsume(queue: "my_queue",
-                                 autoAck: true,
-                                 consumer: consumer);
-
-            Console.WriteLine(" [*] Waiting for messages. To exit press CTRL+C");
-            Console.ReadLine();
-         */
     }
 }

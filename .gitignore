@@ -398,5 +398,6 @@ FodyWeavers.xsd
 *.sln.iml
 
 # Custom
+Migrations/
 *.Development.json
 *.txt
