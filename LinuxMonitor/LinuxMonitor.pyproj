@@ -11,6 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>LinuxMonitor</Name>
     <RootNamespace>LinuxMonitor</RootNamespace>
+    <SuppressEnvironmentCreationPrompt>True</SuppressEnvironmentCreationPrompt>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
