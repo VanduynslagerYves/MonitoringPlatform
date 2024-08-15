@@ -8,61 +8,65 @@
 @using Microsoft.AspNetCore.SignalR
 
 @inject NavigationManager Navigation
-@inject DataService DataService
+@inject IDataService DataService
 
 @implements IAsyncDisposable
 
 <h1>Client monitoring</h1>
 
 <div @ref="listContainer">
-@if (records == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Hostname</th>
-                <th>OS</th>
-                <th>Username</th>
-                <th>CPU</th>
-                <th>Used memory</th>
-                <th>Total memory </th>
-                <th>Uptime</th>
-                <th>Time</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var record in records)
-            {
-                <ListItemComponent Item="@record" />
-            }
-        </tbody>
-    </table>
-}
+    @if (records == null)
+    {
+        <p><em>Loading...</em></p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Hostname</th>
+                    <th>IP</th>
+                    <th>Operating system</th>
+                    <th>CPU</th>
+                    <th>Used memory</th>
+                    <th>Total memory </th>
+                    <th>Uptime</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in records)
+                {
+                    <ListItemComponent Item="@record" />
+                }
+            </tbody>
+        </table>
+    }
 </div>
 
 @code {
     private ElementReference listContainer;
-    // private List<SystemInfoRecord>? records;
     private List<SystemInfoRecord>? records;
     private HubConnection? hubConnection;
 
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("OnInitialized called.");
-        _ = LoadData();
+        await LoadData();
 
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(Navigation.ToAbsoluteUri("/datahub"))
+            .WithUrl(Navigation.ToAbsoluteUri("/datahub"), options =>
+            {
+                options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets;
+            })
+            .WithAutomaticReconnect()
             .Build();
 
-        hubConnection.On("ReceiveDataUpdate", async () =>
+        hubConnection.On("NotifyDataUpdate:all", async () =>
         {
-            Console.WriteLine("ReceiveDataUpdate called.");
+            Console.WriteLine("NotifyDataUpdate:all called.");
             await LoadData();
+            Thread.Sleep(500); //Give some time to update the new data before the ui is refreshed
             await InvokeAsync(StateHasChanged);
         });
 
@@ -72,7 +76,7 @@ else
     private async Task LoadData()
     {
         Console.WriteLine("LoadData called.");
-        records = await DataService.GetAllAsync();//.GetLastAsync();
+        records = await DataService.GetAllAsync();
     }
 
     public async ValueTask DisposeAsync()

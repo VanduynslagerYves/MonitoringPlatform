@@ -1,38 +1,60 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MonitoringWeb.Data;
 using MonitoringWeb.Hubs;
 using MonitoringWeb.Model;
-using System.Drawing;
+using MonitoringWeb.Redis;
+using System.Diagnostics;
 
 namespace MonitoringWeb.Service
 {
-    public class DataService
+    public interface IDataService
+    {
+        Task<SystemInfoRecord?> GetByName(string name);
+        Task<List<SystemInfoRecord>> GetAllAsync();
+        Task AddAsync(SystemInfoRecord record);
+    }
+
+    public class DataService : IDataService
     {
         private readonly IHubContext<DataHub> _hubContext;
-
         private readonly IDbContextFactory<AppDbContext> _contextFactory;
+        private readonly ICacheService _cacheService;
 
-        public DataService(IDbContextFactory<AppDbContext> contextFactory, IHubContext<DataHub> hubContext)
+        public DataService(IDbContextFactory<AppDbContext> contextFactory, IHubContext<DataHub> hubContext, ICacheService cacheService)
         {
             _contextFactory = contextFactory;
             _hubContext = hubContext;
+            _cacheService = cacheService;
         }
 
-        /// <summary>
-        /// Groups records by HostName, but doesn't load all records into memory.
-        /// For each group, it selects only the Hostname and the maximum TimeStamp.This operation is done in the database, reducing the amount of data transferred.
-        /// It then joins this result (which contains only Hostnames and their latest TimeStamps) back to the original SystemInfoRecords table.
-        /// The join matches records where both the Hostname and TimeStamp match, effectively selecting the latest record for each Hostname.
-        /// Finally, it returns the full SystemInfoRecord for each of these matches.
-        /// TODO: get the latest records from cache
-        /// </summary>
-        /// <returns></returns>
+        public async Task<SystemInfoRecord?> GetByName(string name)
+        {
+            var record = await _cacheService.GetAsync<SystemInfoRecord>(name);
+            if (record != null) return record;
+
+            using var context = await _contextFactory.CreateDbContextAsync();
+            record = await context.SystemInfoRecords.FirstOrDefaultAsync(x => x.HostName.Equals(name));
+
+            return record;
+        }
+
         public async Task<List<SystemInfoRecord>> GetAllAsync()
         {
-            using var context = await _contextFactory.CreateDbContextAsync();
+            // Read from cache
+            var groupedCacheRecords = await _cacheService.GetAllAsync<SystemInfoRecord>();
+            if (groupedCacheRecords.Values.Any())
+            {
+                Debug.WriteLine("Reading from cache");
+                //cacheList = groupedCacheRecords.Values.OrderBy(x => x.HostName).ToList();
+                return groupedCacheRecords.Values.OrderBy(x => x.HostName).ToList();
+            }
 
-            var records = await context.SystemInfoRecords
+            Debug.Write("Reading from database");
+            // If no items in cache, read from database
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var records = await context.SystemInfoRecords.AsNoTracking()
             // Group all records by Hostname
             .GroupBy(r => r.HostName)
             // For each group, select the Hostname and its maximum TimeStamp
@@ -51,28 +73,22 @@ namespace MonitoringWeb.Service
                 // The result selector: return the full record from SystemInfoRecords
                 (max, record) => record
             )
+            .OrderBy(r => r.HostName)
             // Execute the query and return results as a list
             .ToListAsync();
 
             return records;
         }
 
-        public async Task<SystemInfoRecord?> GetLastAsync()
+        public async Task AddAsync(SystemInfoRecord record)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var last = await context.SystemInfoRecords.OrderBy(i => i.TimeStamp).LastOrDefaultAsync();
-            return last;
-        }
 
-        public async Task Add(SystemInfoRecord record)
-        {
-            //TODO: add to cache
-            using var context = await _contextFactory.CreateDbContextAsync();
-            context.SystemInfoRecords.Add(record);
+            await context.SystemInfoRecords.AddAsync(record);
             await context.SaveChangesAsync();
 
             //notify clients of model change, the client will fetch the new data
-            await _hubContext.Clients.All.SendAsync("ReceiveDataUpdate");
+            await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
         }
     }
 }

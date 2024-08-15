@@ -1,0 +1,13 @@
+﻿services:
+  windows_system_info_service:
+     build:
+       context: .
+       dockerfile: Dockerfile
+     environment:
+       - RABBITMQ_HOST=rabbitmq
+       - RABBITMQ_PORT=5672
+       - RABBITMQ_USER=admin
+       - RABBITMQ_PASS=root0603
+       - RABBITMQ_VHOST=/
+     deploy:
+       replicas: 0

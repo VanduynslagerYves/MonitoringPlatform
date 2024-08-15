@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   redis-stack:
     image: redis/redis-stack:latest
@@ -25,8 +23,10 @@ services:
       retries: 5
 
   #maybe put this in a separate docker-compose? service_healthy won't work though
-  system_info_service:
-    build: .
+  linux_system_info_service:
+    build:
+     context: .
+     dockerfile: Dockerfile
     environment:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
@@ -37,7 +37,7 @@ services:
       rabbitmq:
         condition: service_healthy
     deploy:
-      replicas: 10
+      replicas: 50
 
 networks:
   default:

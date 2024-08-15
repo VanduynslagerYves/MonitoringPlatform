@@ -3,6 +3,7 @@ using MonitoringWeb.Components;
 using MonitoringWeb.Config;
 using MonitoringWeb.Data;
 using MonitoringWeb.Hubs;
+using MonitoringWeb.Redis;
 using MonitoringWeb.Service;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,7 +15,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddDbContextFactory<AppDbContext>(
     options => options.UseSqlServer(builder.Configuration.GetConnectionString("DbContextConnection")));
 
-builder.Services.AddSingleton<DataService>();
+builder.Services.AddSingleton<RedisConnection>();
+builder.Services.AddScoped<IDataService, DataService>();
+builder.Services.AddSingleton<ICacheService, CacheService>();
 
 builder.Services.AddHostedService<MqDataReceiver>();
 

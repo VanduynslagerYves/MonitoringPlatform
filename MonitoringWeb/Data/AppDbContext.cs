@@ -23,6 +23,12 @@ namespace MonitoringWeb.Data
         public static void MapSystemInfoRecord(EntityTypeBuilder<SystemInfoRecord> sysInfoBuilder)
         {
             sysInfoBuilder.ToTable("SystemInfo");
+
+            sysInfoBuilder.HasKey(x => x.Id).IsClustered(false);
+
+            sysInfoBuilder.HasIndex(x => new { x.TimeStamp, x.HostName, x.Id })
+                .HasDatabaseName("IX_HostName_TimeStamp_Unique")
+                .IsDescending().IsClustered(true).IsUnique();
         }
     }
 }

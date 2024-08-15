@@ -1,49 +1,52 @@
 ﻿@using MonitoringWeb.Model
+
 @code {
     [Parameter]
     public required SystemInfoRecord Item { get; set; }
-    private double MemoryLoad => Item.UsedMemory / Item.TotalMemory * 100;
+    private double _memoryLoad => Item.UsedMemory / Item.TotalMemory * 100;
+    private string _cpuGradient => GetColorGradient(Item.CPULoad);
+    private string _memoryGradient => GetColorGradient(_memoryLoad);
+    private string _cpuFill => GetFill(Item.CPULoad);
+    private string _memoryFill => GetFill(_memoryLoad);
 
     private string GetColorGradient(double load)
     {
-        int red, green, blue = 0;
+        load = Math.Clamp(load, 0, 100); // Ensure load is between 0 and 100
 
-        if (load <= 50)
-        {
-            // Green to Yellow
-            red = (int)(255 * (load / 50.0)); // Transition from 0 to 255
-            green = 255; // Maximum green
-        }
-        else
-        {
-            // Yellow to Red
-            red = 255; // Maximum red
-            green = (int)(255 * (1 - (load - 50) / 50.0)); // Transition from 255 to 0
-        }
+        int red = load <= 50 ? (int)(5.1 * load) : 255;
+        int green = load <= 50 ? 255 : (int)(255 - 5.1 * (load - 50));
+        int blue = 0;
 
         return $"rgb({red},{green},{blue})";
+    }
+
+    private string GetFill(double load)
+    {
+        return string.Format("{0:N0}%", load <= 0.5 ? 0.6 : load);
     }
 }
 <tr class="list-item">
     <td>@Item.HostName</td>
+    <td>@Item.IP</td>
     <td>@Item.OperatingSystem</td>
-    <td>@Item.UserName</td>
     <td>
         <div class="load-bar">
-            <div class="load-fill" style="width: @string.Format("{0:N1}%", @Item.CPULoad); background-color: @GetColorGradient(double.Parse(Item.CPULoad, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture));"></div>
+            <!--load-fill uses the width value to determine its width. Values equal to or smaller than 0.5 are rounded down to 0, therefor this conditional sets it to 0.6 for those cases -->
+            <!--This value does not need to be 100% accurate, it's just a visual display -->
+            <div class="load-fill" style="width: @_cpuFill; background-color: @_cpuGradient;"></div>
         </div>
-        <span>@Item.CPULoad%</span>
+        <span>@string.Format("{0:N1}%", Item.CPULoad)</span>
     </td>
     <td>
         <div class="load-bar">
-            <div class="load-fill" style="width: @string.Format("{0:N0}%", MemoryLoad); background-color: @GetColorGradient(MemoryLoad);"></div>
+            <div class="load-fill" style="width: @_memoryFill; background-color: @_memoryGradient;"></div>
         </div>
-        <span>@string.Format("{0:N2} GB", @Item.UsedMemory)</span>
-        <span>@string.Format("{0:N0}%", MemoryLoad)</span>
+        <span>@string.Format("{0:N2} GB", Item.UsedMemory)</span>
+        <span>(@string.Format("{0:N1}%", _memoryLoad))</span>
     </td>
     <td>@string.Format("{0:N2} GB", @Item.TotalMemory)</td>
     <td>@Item.UpTime.ToString(@"hh\:mm\:ss")</td>
-    <td>@Item.TimeStamp</td>
+    <td>@Item.TimeStamp.ToString(@"HH\:mm\:ss")</td>
 </tr>
 
 <style>
