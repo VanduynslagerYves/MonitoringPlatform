@@ -96,6 +96,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="docker-compose.yml" />
+    <None Include="Dockerfile" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

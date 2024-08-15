@@ -16,7 +16,7 @@ def get_system_info():
     OperatingSystem = " ".join(distro.linux_distribution())
     HostName = socket.gethostname()
     TimeStamp = getLocalTimeString()
-    CPULoad = str(psutil.cpu_percent(interval=1))
+    CPULoad = psutil.cpu_percent(interval=5)
     memory = psutil.virtual_memory()
     UsedMemory = memory.used / (1024 ** 3)
     TotalMemory = memory.total / (1024 ** 3)
@@ -67,7 +67,7 @@ def send_to_rabbitmq(data):
         credentials=credentials
     )
     
-    max_retries = 5
+    max_retries = 5 # Increase for production
     for attempt in range(max_retries):
         try:
             connection = pika.BlockingConnection(parameters)

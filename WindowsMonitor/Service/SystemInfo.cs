@@ -34,7 +34,7 @@ namespace WindowsMonitor.Service
                 {
                     return Dns.GetHostName();
                 }
-                catch(Exception)
+                catch (Exception)
                 {
                     throw new Exception("Error while reading hostname");
                 }
@@ -75,7 +75,7 @@ namespace WindowsMonitor.Service
             get
             {
                 var nameObj = (from x in new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem").Get().Cast<ManagementObject>()
-                            select x.GetPropertyValue("Caption")).FirstOrDefault();
+                               select x.GetPropertyValue("Caption")).FirstOrDefault();
 
                 var name = (nameObj != null) ? nameObj.ToString() : "Unknown";
                 return name ?? string.Empty;
@@ -136,17 +136,21 @@ namespace WindowsMonitor.Service
             }
         }
 
-        public static string CPU
+        public static double CPU
         {
             get
             {
                 ManagementObjectSearcher objMOS = new ManagementObjectSearcher("root\\CIMV2", "SELECT * FROM  Win32_Processor");
                 ManagementObjectCollection results = objMOS.Get();
 
-                string cpu = string.Empty;
+                var cpu = 0.0;
+                //string cpu = string.Empty;
                 foreach (var result in results)
                 {
-                    cpu = result["Name"].ToString();
+                    if (double.TryParse(result["Name"].ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsedResult))
+                    {
+                        cpu = parsedResult;
+                    }
                 }
 
                 return cpu;
@@ -214,5 +218,5 @@ namespace WindowsMonitor.Service
         }
     }
 
-    
+
 }
