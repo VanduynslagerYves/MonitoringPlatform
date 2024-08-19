@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MonitoringWeb.Data;
 using MonitoringWeb.Hubs;
@@ -12,7 +11,7 @@ namespace MonitoringWeb.Service
     public interface IDataService
     {
         Task<SystemInfoRecord?> GetByName(string name);
-        Task<List<SystemInfoRecord>> GetAllAsync();
+        Task<List<SystemInfoRecord>?> GetAllAsync(int pageSize);
         Task AddAsync(SystemInfoRecord record);
     }
 
@@ -40,17 +39,8 @@ namespace MonitoringWeb.Service
             return record;
         }
 
-        public async Task<List<SystemInfoRecord>> GetAllAsync()
+        public async Task<List<SystemInfoRecord>?> GetAllAsync(int pageSize)
         {
-            // Read from cache
-            var groupedCacheRecords = await _cacheService.GetAllAsync<SystemInfoRecord>();
-            if (groupedCacheRecords.Values.Any())
-            {
-                Debug.WriteLine("Reading from cache");
-                //cacheList = groupedCacheRecords.Values.OrderBy(x => x.HostName).ToList();
-                return groupedCacheRecords.Values.OrderBy(x => x.HostName).ToList();
-            }
-
             Debug.Write("Reading from database");
             // If no items in cache, read from database
             using var context = await _contextFactory.CreateDbContextAsync();
@@ -84,11 +74,18 @@ namespace MonitoringWeb.Service
         {
             using var context = await _contextFactory.CreateDbContextAsync();
 
-            await context.SystemInfoRecords.AddAsync(record);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SystemInfoRecords.AddAsync(record);
+                await context.SaveChangesAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine(e.Message);
+            }
 
-            //notify clients of model change, the client will fetch the new data
-            await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
+            ////notify clients of model change, the client will fetch the new data
+            //await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
         }
     }
 }

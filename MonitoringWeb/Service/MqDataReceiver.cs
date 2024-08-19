@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Options;
 using MonitoringWeb.Config;
 using MonitoringWeb.Helpers;
+using MonitoringWeb.Hubs;
 using MonitoringWeb.Model;
 using MonitoringWeb.Redis;
 using RabbitMQ.Client;
@@ -8,7 +10,7 @@ using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
 using System.Diagnostics;
 using System.Text;
-using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace MonitoringWeb.Service
 {
@@ -22,11 +24,14 @@ namespace MonitoringWeb.Service
         private IServiceProvider _serviceProvider;
         private readonly ICacheService _cacheService;
 
+        private readonly IHubContext<DataHub> _hubContext;
+
         private readonly IConnectionFactory _factory;
 
-        public MqDataReceiver(IServiceProvider serviceProvider, IOptions<RabbitMQConfig> mqConfig, ICacheService cacheService)
+        public MqDataReceiver(IServiceProvider serviceProvider, IOptions<RabbitMQConfig> mqConfig, ICacheService cacheService, IHubContext<DataHub> hubContext)
         {
             _serviceProvider = serviceProvider;
+            _hubContext = hubContext;
 
             _factory = new ConnectionFactory
             {
@@ -65,27 +70,32 @@ namespace MonitoringWeb.Service
                 var body = ea.Body.ToArray();
                 var jsonMessage = Encoding.UTF8.GetString(body);
 
-                var record = JsonSerializer.Deserialize<SystemInfoRecord>(jsonMessage);
+                var record = JsonConvert.DeserializeObject<SystemInfoRecord>(jsonMessage);
                 if (record != null)
                 {
                     record.Id = Guid.NewGuid();
 
+                    // Save record to cache with 30s expiration timespan
+                    await _cacheService.AddAsync<SystemInfoRecord>(hostName: record.HostName, systemInfo: record, expiry: TimeSpan.FromMinutes(1));
+                    //notify clients of model change, the client will fetch the new data
+                    await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
+
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var dataService = scope.ServiceProvider.GetRequiredService<IDataService>();
-
-                        // Save record to cache with 30s expiration timespan
-                        await _cacheService.AddAsync<SystemInfoRecord>(hostName: record.HostName, systemInfo: record, expiry: TimeSpan.FromSeconds(30));
-
                         // Save record to db
                         await dataService.AddAsync(record);
                     }
                 }
 
-                _receiveChannel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-
-                Debug.WriteLine(jsonMessage);
-
+                try
+                {
+                    _receiveChannel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+                }
+                catch(AlreadyClosedException e)
+                {
+                    Debug.WriteLine(e.Message);
+                }
             };
 
             _receiveChannel.BasicConsume(queue: "monitor_service_queue", autoAck: false, consumer: createConsumer);

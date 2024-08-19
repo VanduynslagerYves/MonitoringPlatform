@@ -16,7 +16,7 @@ def get_system_info():
     OperatingSystem = " ".join(distro.linux_distribution())
     HostName = socket.gethostname()
     TimeStamp = getLocalTimeString()
-    CPULoad = psutil.cpu_percent(interval=5)
+    CPULoad = psutil.cpu_percent(interval=None)
     memory = psutil.virtual_memory()
     UsedMemory = memory.used / (1024 ** 3)
     TotalMemory = memory.total / (1024 ** 3)
@@ -50,8 +50,8 @@ def getUptimeString():
     # Convert the uptime to a timedelta object
     uptime_timedelta = timedelta(seconds=uptime_seconds)
 
-    # Format the timedelta to the desired string format "hh:mm:ss.ffffff"
-    uptime_str = str(uptime_timedelta)
+    # Format the timedelta to the desired string format "hh:mm:ss"
+    uptime_str = str(uptime_timedelta).split(".")[0]
     
     return uptime_str
 

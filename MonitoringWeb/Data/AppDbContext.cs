@@ -26,7 +26,7 @@ namespace MonitoringWeb.Data
 
             sysInfoBuilder.HasKey(x => x.Id).IsClustered(false);
 
-            sysInfoBuilder.HasIndex(x => new { x.TimeStamp, x.HostName, x.Id })
+            sysInfoBuilder.HasIndex(x => new { x.HostName, x.TimeStamp })
                 .HasDatabaseName("IX_HostName_TimeStamp_Unique")
                 .IsDescending().IsClustered(true).IsUnique();
         }
