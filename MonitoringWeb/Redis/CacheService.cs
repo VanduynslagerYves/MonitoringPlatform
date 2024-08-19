@@ -12,7 +12,8 @@ namespace MonitoringWeb.Redis
         Task<T?> GetAsync<T>(string key);
         Task SetAsync<T>(string key, T value, TimeSpan? expiry = null);
         Task AddAsync<T>(string hostName, T systemInfo, TimeSpan? expiry = null) where T : SystemInfoRecord;
-        Task<Dictionary<string, T>> GetAllAsync<T>() where T : SystemInfoRecord;
+        Task<List<T>> GetPagedAsync<T>(int pageSize = 0) where T : SystemInfoRecord;
+        int GetTotalRecordCount();
     }
 
     public class CacheService : ICacheService
@@ -47,16 +48,6 @@ namespace MonitoringWeb.Redis
         {
             try
             {
-                var existingRecordJson = _db.StringGet(hostName);
-                if (!existingRecordJson.IsNullOrEmpty)
-                {
-                    var existingRecord = JsonConvert.DeserializeObject<T>(existingRecordJson!);
-                    if (systemInfo.TimeStamp <= existingRecord!.TimeStamp)
-                    {
-                        return; // Do not update if the existing record has a more recent timestamp, so only the last record for the hostname will be saved to cache.
-                    }
-                }
-
                 // Serialize and store the record
                 var jsonRecord = JsonConvert.SerializeObject(systemInfo);
                 await _db.StringSetAsync(hostName, jsonRecord, expiry);
@@ -71,14 +62,15 @@ namespace MonitoringWeb.Redis
             }
         }
 
-        // Retrieve all records
-        public async Task<Dictionary<string, T>> GetAllAsync<T>() where T : SystemInfoRecord
+        public async Task<List<T>> GetPagedAsync<T>(int pageSize = 0) where T : SystemInfoRecord
         {
-            var records = new Dictionary<string, T>();
+            var records = new List<T>();
 
             try
             {
-                var allKeys = _server.Keys(pattern: "*").ToList(); // Get all keys
+                var allKeys = pageSize == 0 ?
+                    _server.Keys(pattern: "*").ToList() : // Get all keys
+                    _server.Keys(pattern: "*").Take(pageSize).ToList();
 
                 foreach (var key in allKeys)
                 {
@@ -86,7 +78,7 @@ namespace MonitoringWeb.Redis
                     if (!jsonRecord.IsNullOrEmpty)
                     {
                         var record = JsonConvert.DeserializeObject<T>(jsonRecord!);
-                        records[key!] = record!;
+                        records.Add(record!);
                     }
                 }
             }
@@ -99,7 +91,14 @@ namespace MonitoringWeb.Redis
                 Debug.WriteLine($"Could not establish connection to Redis. {0}", DebugHelper.GetCurrentClassMethodAndLine());
             }
 
-            return records;
+            return records.OrderBy(x => x.HostName).ToList();
+        }
+
+        public int GetTotalRecordCount()
+        {
+            var allKeys = _server.Keys(pattern: "*").ToList();
+
+            return allKeys.Count;
         }
     }
 }
