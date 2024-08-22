@@ -12,7 +12,7 @@ namespace MonitoringWeb.Redis
         Task<T?> GetAsync<T>(string key);
         Task SetAsync<T>(string key, T value, TimeSpan? expiry = null);
         Task AddAsync<T>(string hostName, T systemInfo, TimeSpan? expiry = null) where T : SystemInfoRecord;
-        Task<List<T>> GetPagedAsync<T>(int pageSize = 0) where T : SystemInfoRecord;
+        Task<List<T>> GetPagedAsync<T>(int page, int pageSize, int totalRecords) where T : SystemInfoRecord;
         int GetTotalRecordCount();
     }
 
@@ -62,15 +62,15 @@ namespace MonitoringWeb.Redis
             }
         }
 
-        public async Task<List<T>> GetPagedAsync<T>(int pageSize = 0) where T : SystemInfoRecord
+        public async Task<List<T>> GetPagedAsync<T>(int pageNumber, int pageSize, int totalRecords) where T : SystemInfoRecord
         {
             var records = new List<T>();
 
             try
             {
-                var allKeys = pageSize == 0 ?
+                var allKeys = pageSize == totalRecords ?
                     _server.Keys(pattern: "*").ToList() : // Get all keys
-                    _server.Keys(pattern: "*").Take(pageSize).ToList();
+                    _server.Keys(pattern: "*").Skip((pageNumber-1) * pageSize).Take(pageSize).ToList();
 
                 foreach (var key in allKeys)
                 {

@@ -20,6 +20,7 @@ def get_system_info():
     memory = psutil.virtual_memory()
     UsedMemory = memory.used / (1024 ** 3)
     TotalMemory = memory.total / (1024 ** 3)
+    # MemoryLoad = UsedMemory / TotalMemory
     UserName = os.getenv('USER', 'unknown')
     UpTime = getUptimeString()
 
