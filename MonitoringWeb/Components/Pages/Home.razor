@@ -76,12 +76,13 @@
 
             <div id="item-count-select-bottom">
                 <label>Items per page:</label>
-                <select @onchange="OnItemCountSelectChange">
+                <select @onchange="OnPageSizeSelectChange">
                     @foreach (var selectValue in _actualSelectValues)
                     {
+                        <!-- _actualSelectValues is an int list, but beware that the selected value will be passed on as a string to OnItemCountSelectChange function -->
                         <option value=@selectValue selected="@(GetSelectedValue() == $"{selectValue}" ? "selected" : null)">@selectValue</option>
                     }
-                    <option value=@_totalRecords selected="@(GetSelectedValue() == "All" ? "selected" : null)">All</option>
+                    <option value=@All selected="@(GetSelectedValue() == All ? "selected" : null)">All</option>
 
                 </select>
 
@@ -96,13 +97,14 @@
     private List<SystemInfoRecord>? _records;
     private HubConnection? _hubConnection;
 
+    private const string All = "All";
     private const string SessionKey = "SelectedPageSize";
 
     private int _currentPage = 1;
     private int _totalPages;
     private int _pageSize;
     private int _totalRecords;
-    private string _selectedPageSize { get; set; } = "All";
+    private string _selectedPageSize { get; set; } = All;
 
     private readonly int[] _possibleSelectValues = { 10, 25, 50, 100, 150 };
     private List<int> _actualSelectValues = new();
@@ -114,7 +116,7 @@
         { "50", 50 },
         { "100", 100 },
         { "150", 150 },
-        { "All", -1 }
+        { All, -1 }
     };
 
     private bool CanGoToPreviousPage => _currentPage > 1;
@@ -143,8 +145,7 @@
     private async Task LoadData()
     {
         _totalRecords = CacheService.GetTotalRecordCount();
-        _selectMap["All"] = _totalRecords; //Set the "All" mapping to the total number of possible records, used as a fallback
-        _selectMap[_totalRecords.ToString()] = _totalRecords; //map the key for total records to it's corresponding value
+        _selectMap[All] = _totalRecords; //Set the "All" mapping to the total number of possible records
 
         // Populate _selectValues with only the values that are less than or equal to _totalRecordCount
         _actualSelectValues = _possibleSelectValues.Where(v => v <= _totalRecords).ToList();
@@ -162,13 +163,13 @@
         _records = pagedRecords;
     }
 
-    private async Task OnItemCountSelectChange(ChangeEventArgs eventArgs)
+    private async Task OnPageSizeSelectChange(ChangeEventArgs eventArgs)
     {
-        _selectedPageSize = eventArgs.Value?.ToString() ?? "All";
-        _pageSize = _selectMap[_selectedPageSize]; //if _selectedPageSize has no value for some reason, fallback to the "All" key
+        _selectedPageSize = eventArgs.Value?.ToString() ?? All;
+        _pageSize = _selectMap[_selectedPageSize];
 
         _currentPage = 1;
-        //TODO: also save the selected page
+        //TODO: also session save the selected page
 
         //Session save the select value
         var httpContext = HttpContextAccessor.HttpContext;
@@ -176,7 +177,7 @@
         {
             httpContext.Session.SetString(SessionKey, _selectedPageSize);
         }
-        
+
         await LoadData();
         await InvokeAsync(StateHasChanged);
     }
@@ -186,10 +187,10 @@
         var httpContext = HttpContextAccessor.HttpContext;
         if (httpContext != null)
         {
-            return httpContext.Session.GetString(SessionKey) ?? "All";
+            return httpContext.Session.GetString(SessionKey) ?? All;
         }
 
-        return "All";
+        return All;
     }
 
     private async Task FirstPage()
