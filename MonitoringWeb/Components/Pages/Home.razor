@@ -143,7 +143,8 @@
     private async Task LoadData()
     {
         _totalRecords = CacheService.GetTotalRecordCount();
-        _selectMap["All"] = _totalRecords; //Set the "All" mapping to the total number of possible records
+        _selectMap["All"] = _totalRecords; //Set the "All" mapping to the total number of possible records, used as a fallback
+        _selectMap[_totalRecords.ToString()] = _totalRecords; //map the key for total records to it's corresponding value
 
         // Populate _selectValues with only the values that are less than or equal to _totalRecordCount
         _actualSelectValues = _possibleSelectValues.Where(v => v <= _totalRecords).ToList();
@@ -164,7 +165,7 @@
     private async Task OnItemCountSelectChange(ChangeEventArgs eventArgs)
     {
         _selectedPageSize = eventArgs.Value?.ToString() ?? "All";
-        _pageSize = _selectMap[_selectedPageSize];
+        _pageSize = _selectMap[_selectedPageSize]; //if _selectedPageSize has no value for some reason, fallback to the "All" key
 
         _currentPage = 1;
         //TODO: also save the selected page
