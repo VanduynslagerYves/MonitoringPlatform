@@ -79,10 +79,10 @@
                 <select @onchange="OnPageSizeSelectChange">
                     @foreach (var selectValue in _actualSelectValues)
                     {
-                        <!-- _actualSelectValues is an int list, but beware that the selected value will be passed on as a string to OnItemCountSelectChange function -->
-                        <option value=@selectValue selected="@(GetSelectedValue() == $"{selectValue}" ? "selected" : null)">@selectValue</option>
+                        <!-- _actualSelectValues is an int list, but beware that the selected value will be passed on as a string to OnPageSizeSelectChange function -->
+                        <option value=@selectValue selected="@(GetPageSizeFromSession() == $"{selectValue}" ? "selected" : null)">@selectValue</option>
                     }
-                    <option value=@All selected="@(GetSelectedValue() == All ? "selected" : null)">All</option>
+                    <option value=@All selected="@(GetPageSizeFromSession() == All ? "selected" : null)">All</option>
 
                 </select>
 
@@ -98,7 +98,7 @@
     private HubConnection? _hubConnection;
 
     private const string All = "All";
-    private const string SessionKey = "SelectedPageSize";
+    private const string _pageSizeSessionKey = "SelectedPageSize";
 
     private int _currentPage = 1;
     private int _totalPages;
@@ -150,14 +150,14 @@
         // Populate _selectValues with only the values that are less than or equal to _totalRecordCount
         _actualSelectValues = _possibleSelectValues.Where(v => v <= _totalRecords).ToList();
 
-        _selectedPageSize = GetSelectedValue();
+        _selectedPageSize = GetPageSizeFromSession();
         _pageSize = _selectMap[_selectedPageSize];
         if (_pageSize == 0) _pageSize = _totalRecords;
 
         var pagedRecords = await CacheService.GetPagedAsync<SystemInfoRecord>(_currentPage, _pageSize, _totalRecords);
         if (pagedRecords == null) return;
 
-        // Calculate the total number of pages
+        // Calculate the number of pages
         _totalPages = (int)Math.Ceiling(_totalRecords / (double)_pageSize);
 
         _records = pagedRecords;
@@ -166,33 +166,39 @@
     private async Task OnPageSizeSelectChange(ChangeEventArgs eventArgs)
     {
         _selectedPageSize = eventArgs.Value?.ToString() ?? All;
-        _pageSize = _selectMap[_selectedPageSize];
+        //_pageSize = _selectMap[_selectedPageSize]; //not needed? happens in LoadData()
 
         _currentPage = 1;
         //TODO: also session save the selected page
 
-        //Session save the select value
-        var httpContext = HttpContextAccessor.HttpContext;
-        if (httpContext != null)
-        {
-            httpContext.Session.SetString(SessionKey, _selectedPageSize);
-        }
+        //Session save the selected page size value
+        SetPageSizeForSession();
 
         await LoadData();
         await InvokeAsync(StateHasChanged);
     }
 
-    private string GetSelectedValue()
+    private string GetPageSizeFromSession()
     {
         var httpContext = HttpContextAccessor.HttpContext;
         if (httpContext != null)
         {
-            return httpContext.Session.GetString(SessionKey) ?? All;
+            return httpContext.Session.GetString(_pageSizeSessionKey) ?? All;
         }
 
         return All;
     }
 
+    private void SetPageSizeForSession()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            httpContext.Session.SetString(_pageSizeSessionKey, _selectedPageSize);
+        }
+    }
+
+    #region Navigation
     private async Task FirstPage()
     {
         if (CanGoToPreviousPage)
@@ -232,6 +238,7 @@
             await InvokeAsync(StateHasChanged);
         }
     }
+    #endregion
 
     public async ValueTask DisposeAsync()
     {

@@ -11,7 +11,6 @@ using RabbitMQ.Client.Exceptions;
 using System.Diagnostics;
 using System.Text;
 using Newtonsoft.Json;
-using SystemTimer = System.Timers.Timer;
 
 namespace MonitoringWeb.Service
 {
