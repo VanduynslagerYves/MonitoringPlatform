@@ -1,9 +1,8 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 
-namespace MonitoringWeb.Hubs
+namespace MonitoringWeb.Hubs;
+
+public class DataHub : Hub
 {
-    public class DataHub : Hub
-    {
-        //Use to handle client-initiated interactions
-    }
+    //Use to handle client-initiated interactions
 }

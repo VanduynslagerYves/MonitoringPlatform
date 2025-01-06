@@ -1,10 +1,9 @@
-﻿namespace MonitoringWeb.Config
+﻿namespace MonitoringWeb.Config;
+
+public class RabbitMQConfig
 {
-    public class RabbitMQConfig
-    {
-        public required string Uri { get; set; }
-        public required int Port { get; set; }
-        public required string UserName { get; set; }
-        public required string Password { get; set; }
-    }
+    public required string Uri { get; set; }
+    public required int Port { get; set; }
+    public required string UserName { get; set; }
+    public required string Password { get; set; }
 }
