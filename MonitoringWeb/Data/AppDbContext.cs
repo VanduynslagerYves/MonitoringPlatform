@@ -28,7 +28,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         sysInfoBuilder.Property(x => x.IP).HasMaxLength(15);
         sysInfoBuilder.Property(x => x.OperatingSystem).HasMaxLength(60);
 
-
         sysInfoBuilder.HasIndex(x => new { x.HostName, x.TimeStamp })
             .HasDatabaseName("IX_HostName_TimeStamp_Unique")
             .IsDescending().IsClustered(true).IsUnique();

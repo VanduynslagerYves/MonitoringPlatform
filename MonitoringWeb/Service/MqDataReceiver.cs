@@ -20,7 +20,7 @@ namespace MonitoringWeb.Service;
 public class MqDataReceiver : BackgroundService //TODO: place in separate background-service
 {
     private IConnection? _connection;
-    private IModel? _receiveChannel;
+    private IChannel? _receiveChannel;
 
     private readonly IServiceProvider _serviceProvider;
     private readonly ICacheService _cacheService;
@@ -49,19 +49,19 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
         _cacheService = cacheService;
     }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (_receiveChannel == null)
         {
             try
             {
-                _connection = _factory.CreateConnection();
-                _receiveChannel = _connection.CreateModel();
+                _connection = await _factory.CreateConnectionAsync(stoppingToken);
+                _receiveChannel = await _connection.CreateChannelAsync(cancellationToken: stoppingToken);
 
-                _receiveChannel.QueueDeclare(queue: "monitor_service_queue",
-                    durable: false, exclusive: false, autoDelete: false, arguments: null);
+                await _receiveChannel.QueueDeclareAsync(queue: "monitor_service_queue",
+                    durable: false, exclusive: false, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
 
-                _receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+                await _receiveChannel.BasicQosAsync(prefetchSize: 0, prefetchCount: 10, global: false, cancellationToken: stoppingToken);
             }
             catch (BrokerUnreachableException)
             {
@@ -75,15 +75,15 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
         //timer.AutoReset = true;
         //timer.Start();
 
-        var systemInfoConsumer = new EventingBasicConsumer(_receiveChannel);
-        systemInfoConsumer.Received += OnItemReceived;
+        var systemInfoConsumer = new AsyncEventingBasicConsumer(_receiveChannel);
+        systemInfoConsumer.ReceivedAsync += OnItemReceived;
 
-        _receiveChannel.BasicConsume(queue: "monitor_service_queue", autoAck: false, consumer: systemInfoConsumer);
+        await _receiveChannel.BasicConsumeAsync(queue: "monitor_service_queue", autoAck: false, consumer: systemInfoConsumer, cancellationToken: stoppingToken);
 
-        return Task.CompletedTask;
+        //return Task.CompletedTask;
     }
 
-    private async void OnItemReceived(object? sender, BasicDeliverEventArgs ea)
+    private async Task OnItemReceived(object? sender, BasicDeliverEventArgs ea)
     {
         try
         {
@@ -120,7 +120,7 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
                 }
             }
 
-            _receiveChannel!.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
+            await _receiveChannel!.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
         }
         catch (AlreadyClosedException e)
         {
