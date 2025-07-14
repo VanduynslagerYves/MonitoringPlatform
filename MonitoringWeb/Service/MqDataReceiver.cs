@@ -69,18 +69,10 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
             }
         }
 
-        //int processedCount = 0;
-        //var timer = new SystemTimer();
-        //timer.Interval = 5000; //ms
-        //timer.AutoReset = true;
-        //timer.Start();
-
         var systemInfoConsumer = new AsyncEventingBasicConsumer(_receiveChannel);
         systemInfoConsumer.ReceivedAsync += OnItemReceived;
 
         await _receiveChannel.BasicConsumeAsync(queue: "monitor_service_queue", autoAck: false, consumer: systemInfoConsumer, cancellationToken: stoppingToken);
-
-        //return Task.CompletedTask;
     }
 
     private async Task OnItemReceived(object? sender, BasicDeliverEventArgs ea)
@@ -98,8 +90,6 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
                 // Save record to cache with 30s expiration timespan
                 await _cacheService.AddAsync<SystemInfoRecord>(hostName: record.HostName, systemInfo: record, expiry: TimeSpan.FromMinutes(1));
 
-                //await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
-
                 using var scope = _serviceProvider.CreateScope();
                 {
                     var dataService = scope.ServiceProvider.GetRequiredService<IDataService>();
@@ -116,6 +106,8 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
                     _processedCount = 0;
 
                     //notify clients of model change, the client will fetch the new data
+                    //TODO: refactor, so the data is passed straight to the client instead of letting the client fetch the data after a notify.
+                    //TODO: also do this per client data item instead of all clients => razor page code (ListItemComponent and Home) need to be refactored aswell
                     await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
                 }
             }
