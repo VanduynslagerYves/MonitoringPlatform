@@ -107,7 +107,10 @@
     private string _selectedPageSize { get; set; } = All;
 
     private readonly int[] _possibleSelectValues = { 10, 25, 50, 100, 150 };
-    private List<int> _actualSelectValues = new();
+    private List<int> _actualSelectValues = [];
+
+    private HashSet<string>? _hostnamesToUpdateSet;
+    private List<SystemInfoRecord> _pagedRecords = [];
 
     private Dictionary<string, int> _selectMap = new()
     {
@@ -132,8 +135,9 @@
             .WithAutomaticReconnect()
             .Build();
 
-        _hubConnection.On("NotifyDataUpdate:all", async () =>
+        _hubConnection.On<HashSet<string>>("NotifyDataUpdate", async (hostnamesToUpdate) =>
         {
+            _hostnamesToUpdateSet = hostnamesToUpdate;
             await LoadData();
             Thread.Sleep(500); //Give some time to update the new data before the ui is refreshed
             await InvokeAsync(StateHasChanged);
@@ -154,20 +158,29 @@
         _pageSize = _selectMap[_selectedPageSize];
         if (_pageSize == 0) _pageSize = _totalRecords;
 
-        var pagedRecords = await CacheService.GetPagedAsync<SystemInfoRecord>(_currentPage, _pageSize, _totalRecords);
-        if (pagedRecords == null) return;
+        if(_hostnamesToUpdateSet != null) //There is data to be updated
+        {
+            //get from cache when _dataUpdateDTO.Hostnames has any hostname that is in the _pagedRecords list
+            var currentHostnamesOnPageSet = new HashSet<string>(_pagedRecords.Select(x => x.HostName));
+            if (_hostnamesToUpdateSet.Any(hostname => currentHostnamesOnPageSet.Contains(hostname)))
+            {
+                _pagedRecords = await CacheService.GetPagedAsync<SystemInfoRecord>(_currentPage, _pageSize, _totalRecords);
+            }
+        }
+        if(!_pagedRecords.Any()) //Initial load on startup, dirty
+        {
+            _pagedRecords = await CacheService.GetPagedAsync<SystemInfoRecord>(_currentPage, _pageSize, _totalRecords);
+        }
 
         // Calculate the number of pages
         _totalPages = (int)Math.Ceiling(_totalRecords / (double)_pageSize);
 
-        _records = pagedRecords;
+        _records = _pagedRecords;
     }
 
     private async Task OnPageSizeSelectChange(ChangeEventArgs eventArgs)
     {
         _selectedPageSize = eventArgs.Value?.ToString() ?? All;
-        //_pageSize = _selectMap[_selectedPageSize]; //not needed? happens in LoadData()
-
         _currentPage = 1;
         //TODO: also session save the selected page
 

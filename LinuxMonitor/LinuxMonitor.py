@@ -40,7 +40,7 @@ def getLocalTimeString():
     timestamp = datetime.now()
 
     # Format the timestamp as a string in the desired format
-    timestamp_str = timestamp.strftime("%Y-%m-%dT%H:%M:%S")
+    timestamp_str = timestamp.isoformat(timespec='milliseconds')
     
     return timestamp_str
 
