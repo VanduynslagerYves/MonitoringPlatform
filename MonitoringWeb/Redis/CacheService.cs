@@ -69,15 +69,15 @@ public class CacheService : ICacheService
         try
         {
             var allKeys = pageSize == totalRecords ?
-                _server.Keys(pattern: "*").ToList() : // Get all keys
+                [.. _server.Keys(pattern: "*")] : // Get all keys
                 _server.Keys(pattern: "*").Skip((pageNumber-1) * pageSize).Take(pageSize).ToList();
 
             foreach (var key in allKeys)
             {
-                var jsonRecord = await _db.StringGetAsync(key);
-                if (!jsonRecord.IsNullOrEmpty)
+                var value = await _db.StringGetAsync(key);
+                if (!value.IsNullOrEmpty)
                 {
-                    var record = JsonConvert.DeserializeObject<T>(jsonRecord!);
+                    var record = JsonConvert.DeserializeObject<T>(value!);
                     records.Add(record!);
                 }
             }

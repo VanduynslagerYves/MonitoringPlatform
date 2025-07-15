@@ -27,11 +27,12 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
     private readonly IHubContext<DataHub> _hubContext;
     private readonly ConnectionFactory _factory;
 
+    private readonly HashSet<string> _hostnamesToUpdateSet;
+
     //TODO: Read from appsettings.json, increase for higher client count, decrease for lower client count, sync with prefetchCount
     //TODO: mechanism to decrease or increase this value at runtime based on the number of reporting clients.
-    //example: 1 client and _processedTreshold of 10 will be too slow if it reports every 5 seconds
-    private const int _processedTreshold = 20;
-    private int _processedCount = 0;
+    private const int _processedTreshold = 20; //example: 1 client and _processedTreshold of 10 will be too slow if it reports every 5 seconds
+    private readonly TimeSpan _queueExpiry = TimeSpan.FromMinutes(1);
 
     public MqDataReceiver(IServiceProvider serviceProvider, IOptions<RabbitMQConfig> mqConfig, ICacheService cacheService, IHubContext<DataHub> hubContext)
     {
@@ -47,8 +48,10 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
         };
 
         _cacheService = cacheService;
+        _hostnamesToUpdateSet = [];
     }
 
+    //TODO: refactor so data from clients are received through webAPI, then placed in queue.
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (_receiveChannel == null)
@@ -85,10 +88,11 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
             var record = JsonConvert.DeserializeObject<SystemInfoRecord>(jsonMessage);
             if (record != null)
             {
-                record.Id = Guid.NewGuid();
+                record.Id = Guid.NewGuid(); //TODO: separate models for db and cache, no need to save the guid in cache
 
-                // Save record to cache with 30s expiration timespan
-                await _cacheService.AddAsync<SystemInfoRecord>(hostName: record.HostName, systemInfo: record, expiry: TimeSpan.FromMinutes(1));
+                // Save record to cache with 60s expiration timespan
+                await _cacheService.AddAsync<SystemInfoRecord>(hostName: record.HostName, systemInfo: record, expiry: _queueExpiry);
+                _hostnamesToUpdateSet.Add(record.HostName);
 
                 using var scope = _serviceProvider.CreateScope();
                 {
@@ -97,18 +101,15 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
                     await dataService.AddAsync(record);
                 }
 
-                //timer.Elapsed += OnTimeElapsed;
-
-                _processedCount++;
-                if (_processedCount >= _processedTreshold) //We will only notify of new data when there are 10 or more items consumed and saved to the cache and database.
+                //We will only notify of new data when there are 20 or more items consumed and saved to the cache and database.
+                //This is a dirty fix to eliminate lag when paging. 20 because minimum page size is 10
+                if (_hostnamesToUpdateSet.Count >= _processedTreshold)
                 {
-                    Debug.WriteLine($"{DateTime.Now}: {_processedTreshold} or more items consumed, calling NotifyDataUpdate:all");
-                    _processedCount = 0;
+                    Debug.WriteLine($"{DateTime.Now}: {_processedTreshold} or more items consumed, calling NotifyDataUpdate");
 
-                    //notify clients of model change, the client will fetch the new data
-                    //TODO: refactor, so the data is passed straight to the client instead of letting the client fetch the data after a notify.
-                    //TODO: also do this per client data item instead of all clients => razor page code (ListItemComponent and Home) need to be refactored aswell
-                    await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
+                    //notify clients of model change, the client will fetch the new data if needed, based on paging
+                    await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate", _hostnamesToUpdateSet);
+                    _hostnamesToUpdateSet.Clear();
                 }
             }
 
@@ -123,13 +124,4 @@ public class MqDataReceiver : BackgroundService //TODO: place in separate backgr
             Debug.WriteLine(e.Message);
         }
     }
-
-    //private async void OnTimeElapsed(object? sender, ElapsedEventArgs e)
-    //{
-    //    Debug.WriteLine($"{DateTime.Now}: {_processedTreshold} or more items consumed, calling NotifyDataUpdate:all");
-    //    //processedCount = 0;
-
-    //    //notify clients of model change, the client will fetch the new data
-    //    await _hubContext.Clients.All.SendAsync($"NotifyDataUpdate:all");
-    //}
 }
